@@ -1,0 +1,16 @@
+Antonia:
+- [ ] bplus_datanode.c
+- [ ] bplus_datanode.h
+
+Theodora:
+- [ ] bplus_indexnode.c
+- [ ] bplus_indexnode.h
+
+Charitini:
+- [ ] bplus_file_funcs.c
+- [ ] bplus_file_structs.h
+
+TO ALL:
+- [ ] insert in func 
+- [ ] test
+- [ ] readme 

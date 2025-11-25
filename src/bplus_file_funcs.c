@@ -32,6 +32,7 @@ int bplus_close_file(const int file_desc, BPlusMeta* metadata)
   return -1;
 }
 
+// Το see if we want to do it as a team
 int bplus_record_insert(const int file_desc, BPlusMeta *metadata, const Record *record)
 {
   return -1;
