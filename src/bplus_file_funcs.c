@@ -1,5 +1,9 @@
 #include "bplus_file_funcs.h"
+#include "bplus_datanode.h"
+#include "bplus_index_node.h"
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #define CALL_BF(call)         \
   {                           \
