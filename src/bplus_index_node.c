@@ -9,6 +9,8 @@
  * @param is_leaf 1 if this is a leaf node, 0 if internal index node.
  */
 void indexnode_init(BPlusIndexNode *node, int is_leaf) {
+    node->num_keys = 0;
+    node->is_leaf = is_leaf;
 }
 
 /**
@@ -17,6 +19,7 @@ void indexnode_init(BPlusIndexNode *node, int is_leaf) {
  * @return Number of keys in the node.
  */
 int indexnode_get_num_keys(const BPlusIndexNode *node) {
+    return node->num_keys;
 }
 
 /**
@@ -26,6 +29,13 @@ int indexnode_get_num_keys(const BPlusIndexNode *node) {
  * @return The key value, or -1 on failure.
  */
 int indexnode_get_key(const BPlusIndexNode *node, int pos) {
+    if (pos < 0 || pos >= node->num_keys) {
+        return -1; // Invalid position
+    }
+
+    int key;
+    memcpy(&key, node->data + pos * sizeof(int), sizeof(int));
+    return key;
 }
 
 /**
@@ -35,6 +45,13 @@ int indexnode_get_key(const BPlusIndexNode *node, int pos) {
  * @return The block ID, or -1 on failure.
  */
 int indexnode_get_pointer(const BPlusIndexNode *node, int pos) {
+    if (pos < 0 || pos > node->num_keys) {
+        return -1; // Invalid position
+    }
+
+    int pointer;
+    memcpy(&pointer, node->data + (node->num_keys * sizeof(int)) + pos * sizeof(int), sizeof(int));
+    return pointer;
 }
 
 /**
@@ -45,6 +62,12 @@ int indexnode_get_pointer(const BPlusIndexNode *node, int pos) {
  * @return 0 on success, -1 on failure.
  */
 int indexnode_set_key(BPlusIndexNode *node, int pos, int key) {
+    if (pos < 0 || pos >= node->num_keys) {
+        return -1; // Invalid position
+    }
+
+    memcpy(node->data + pos * sizeof(int), &key, sizeof(int));
+    return 0;
 }
 
 /**
@@ -55,6 +78,12 @@ int indexnode_set_key(BPlusIndexNode *node, int pos, int key) {
  * @return 0 on success, -1 on failure.
  */
 int indexnode_set_pointer(BPlusIndexNode *node, int pos, int block_id) {
+    if (pos < 0 || pos > node->num_keys) {
+        return -1; // Invalid position
+    }
+
+    memcpy(node->data + (node->num_keys * sizeof(int)) + pos * sizeof(int), &block_id, sizeof(int));
+    return 0;
 }
 
 /**
@@ -84,4 +113,5 @@ int indexnode_find_child(const BPlusIndexNode *node, int key) {
  * @return 1 if leaf node, 0 if internal index node.
  */
 int indexnode_is_leaf(const BPlusIndexNode *node) {
+    return node->is_leaf;
 }
