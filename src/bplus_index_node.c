@@ -11,6 +11,11 @@
 void indexnode_init(BPlusIndexNode *node, int is_leaf) {
     node->num_keys = 0;
     node->is_leaf = is_leaf;
+    // Calculate max_keys based on available data space
+    // Each entry needs 1 key (int) and we need num_keys + 1 pointers (ints)
+    // So total: num_keys * sizeof(int) + (num_keys + 1) * sizeof(int) <= data size
+    // Solving: num_keys * (2 * sizeof(int)) + sizeof(int) <= data size
+    node->max_keys = (sizeof(node->data) - sizeof(int)) / (2 * sizeof(int));
 }
 
 /**
@@ -95,7 +100,29 @@ int indexnode_set_pointer(BPlusIndexNode *node, int pos, int block_id) {
  * @return 0 on success, -1 on failure.
  */
 int indexnode_add_key_pointer(BPlusIndexNode *node, int key, int left_child, int right_child) {
+    if (node->num_keys >= node->max_keys) {
+        return -1; // No space available
+    }
 
+    // Find position to insert the new key
+    int pos = 0;
+    while (pos < node->num_keys && indexnode_get_key(node, pos) < key) {
+        pos++;
+    }
+
+    // Shift keys and pointers to make space
+    for (int i = node->num_keys; i > pos; i--) {
+        indexnode_set_key(node, i, indexnode_get_key(node, i - 1));
+        indexnode_set_pointer(node, i + 1, indexnode_get_pointer(node, i));
+    }
+
+    // Insert new key and pointers
+    indexnode_set_key(node, pos, key);
+    indexnode_set_pointer(node, pos, left_child);
+    indexnode_set_pointer(node, pos + 1, right_child);
+
+    node->num_keys++;
+    return 0;
 }
 
 /**
@@ -105,6 +132,11 @@ int indexnode_add_key_pointer(BPlusIndexNode *node, int key, int left_child, int
  * @return The child block ID to descend to, or -1 on failure.
  */
 int indexnode_find_child(const BPlusIndexNode *node, int key) {
+    int pos = 0;
+    while (pos < node->num_keys && indexnode_get_key(node, pos) <= key) {
+        pos++;
+    }
+    return indexnode_get_pointer(node, pos);
 }
 
 /**

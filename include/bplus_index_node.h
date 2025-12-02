@@ -11,6 +11,7 @@ typedef struct {
   int num_keys;                                 /**< Number of keys in this index node */
   int is_leaf;                                  /**< 1 if this is a leaf node, 0 if internal index node */
   char data[BF_BLOCK_SIZE - 2 * sizeof(int)];  /**< Keys and pointers data */
+  int max_keys;                              /**< Maximum number of keys the node can hold */
 } BPlusIndexNode;
 
 /**
