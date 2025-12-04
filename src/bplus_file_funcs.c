@@ -5,6 +5,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define bplus_OK 0
+#define bplus_ERROR -1
+
 #define CALL_BF(call)         \
   {                           \
     BF_ErrorCode code = call; \
@@ -33,7 +36,7 @@ int bplus_create_file(const TableSchema *schema, const char *fileName)
     BPlusMeta meta;
     memcpy(&meta.schema, schema, sizeof(TableSchema));
     meta.root_block = 1;      // the root will be the block 1 
-    meta.depth = 1;           // only leaf level 
+    meta.height = 1;          // only leaf level 
     meta.file_desc = fd;   // runtime
 
     memcpy(data, &meta, sizeof(BPlusMeta));
@@ -115,7 +118,7 @@ int bplus_record_find(const int file_desc, const BPlusMeta *metadata, const int 
     Record *tmp = malloc(sizeof(Record));
 
     for (int i = 0; i < num; i++) {
-        datanode_get_record(node, i, &metadata->schema, tmp);
+        datanode_get_record(node, i, tmp);
 
         if (record_get_key(&metadata->schema, tmp) == key) {
             *out_record = tmp;
