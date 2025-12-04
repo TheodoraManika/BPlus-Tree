@@ -29,6 +29,8 @@ int datanode_get_num_records(const BPlusDataNode *node);
  */
 int datanode_get_record(const BPlusDataNode *node, int pos,  Record *out_record);
 
+int datanode_split(BPlusDataNode *old_node, BPlusDataNode *new_node);
+
 int datanode_max_records(const BPlusDataNode *node);
 
 

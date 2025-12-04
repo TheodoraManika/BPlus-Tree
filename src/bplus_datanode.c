@@ -44,6 +44,34 @@ int datanode_get_record(const BPlusDataNode *node, int pos, Record *out_record) 
     return 0;
 }
 
+/**
+ * Split a full leaf node
+ * @param old_node The leaf node to split
+ * @param new_node Pointer to newly allocated node
+ * @return index of first record in new_node (the split key for parent)
+ */
+int datanode_split(BPlusDataNode *old_node, BPlusDataNode *new_node) {
+    datanode_init(new_node);
+
+    int total = old_node->num_records;
+    int mid = total / 2;  // split in half
+
+    // Copy upper half to new node
+    int move_count = total - mid;
+    memcpy(new_node->data, old_node->data + mid * sizeof(Record), move_count * sizeof(Record));
+    new_node->num_records = move_count;
+    old_node->num_records = mid;
+
+    // Update leaf links
+    new_node->next_leaf = old_node->next_leaf;
+    new_node->prev_leaf = -1; // will be updated by caller
+    old_node->next_leaf = -1; // will be updated by caller
+
+    // Return key for parent (first record in new node)
+    Record *split_key = (Record *)new_node->data;
+    return split_key->values[0].int_value; // assumes primary key is int
+}
+
 
 /**
  * @brief Sets a record in a data node at a specific position.
