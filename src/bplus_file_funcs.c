@@ -62,7 +62,7 @@ int bplus_create_file(const TableSchema *schema, const char *fileName)
     BF_Block_Destroy(&root_block);
 
     CALL_BF(BF_CloseFile(fd));
-  return -1;
+  return bplus_OK;
 }
 
 
@@ -85,14 +85,14 @@ int bplus_open_file(const char *fileName, int *file_desc, BPlusMeta **metadata)
     CALL_BF(BF_UnpinBlock(block));
     BF_Block_Destroy(&block);
 
-  return -1;
+  return bplus_OK;
 }
 
 int bplus_close_file(const int file_desc, BPlusMeta* metadata)
 {
   free(metadata);
     CALL_BF(BF_CloseFile(file_desc));
-  return -1;
+  return bplus_OK;
 }
 
 // Το see if we want to do it as a team
@@ -132,8 +132,10 @@ int bplus_record_find(const int file_desc, const BPlusMeta *metadata, const int 
 
     CALL_BF(BF_UnpinBlock(block));
     BF_Block_Destroy(&block);
+  
   *out_record=NULL;
-  return -1;
+  return bplus_ERROR;
 }
+
 
 
