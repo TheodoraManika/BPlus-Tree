@@ -28,6 +28,15 @@ int indexnode_get_num_keys(const BPlusIndexNode *node) {
 }
 
 /**
+ * @brief Gets the maximum number of keys the node can hold.
+ * @param node Pointer to the index node.
+ * @return Maximum number of keys.
+ */
+int indexnode_get_max_keys(const BPlusIndexNode *node) {
+    return node->max_keys;
+}
+
+/**
  * @brief Gets a key from an index node at a specific position.
  * @param node Pointer to the index node.
  * @param pos Position of the key (0-based).

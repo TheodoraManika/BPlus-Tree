@@ -25,6 +25,11 @@ void indexnode_init(BPlusIndexNode *node, int is_leaf);
 int indexnode_get_num_keys(const BPlusIndexNode *node);
 
 /**
+ * @brief Gets the maximum number of keys the node can hold.
+ */
+int indexnode_get_max_keys(const BPlusIndexNode *node);
+
+/**
  * @brief Gets a key from an index node at a specific position.
  */
 int indexnode_get_key(const BPlusIndexNode *node, int pos);
