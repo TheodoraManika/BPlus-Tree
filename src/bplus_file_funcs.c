@@ -95,10 +95,35 @@ int bplus_close_file(const int file_desc, BPlusMeta* metadata)
   return bplus_OK;
 }
 
-// Το see if we want to do it as a team
 int bplus_record_insert(const int file_desc, BPlusMeta *metadata, const Record *record)
 {
-  return -1;
+  int block_id = metadate->root_block;
+
+  BF_Block *block;
+  BF_Block_Init(&block);
+
+  CALL_BF(BF_GetBlock(file_desc, block_id, block));
+  char *data = BF_Block_GetData(block);
+
+  BPlusDataNode *node = (BPlusDataNode*)data;
+
+  int num = datanode_get_num_records(node);
+  
+  //If it doesn't support the split yet
+  if (num >= DATANODE_MAX_RECORDS){
+    CALL_BF(BF_UnpinBlock(block));
+    BF_Block_Destroy(&block);
+    return bplus_ERROR; //If it doesn't have a limit
+  }
+
+  //We do an insertion in a sorted order
+  datanode_insert_record(node, record);
+
+  BF_Block_SetDirty(block);
+  CALL_BF(BF_UnpinBlock(block));
+  BF_Block_Destroy(&block);
+  
+  return bplus_OK;
 }
 
 int bplus_record_find(const int file_desc, const BPlusMeta *metadata, const int key, Record** out_record)
@@ -136,6 +161,7 @@ int bplus_record_find(const int file_desc, const BPlusMeta *metadata, const int 
   *out_record=NULL;
   return bplus_ERROR;
 }
+
 
 
 
