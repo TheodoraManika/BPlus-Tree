@@ -64,4 +64,6 @@ int indexnode_find_child(const BPlusIndexNode *node, int key);
  */
 int indexnode_is_leaf(const BPlusIndexNode *node);
 
+int indexnode_split(BPlusIndexNode *old_node, BPlusIndexNode *new_node);
+
 #endif

@@ -156,3 +156,23 @@ int indexnode_find_child(const BPlusIndexNode *node, int key) {
 int indexnode_is_leaf(const BPlusIndexNode *node) {
     return node->is_leaf;
 }
+
+int indexnode_split(BPlusIndexNode *old_node, BPlusIndexNode *new_node) {
+    int total_keys = old_node->num_keys;
+    int mid_index = total_keys / 2;
+
+    int middle_key = indexnode_get_key(old_node, mid_index);
+
+   
+    for (int i = mid_index + 1, j = 0; i < total_keys; i++, j++) {
+        int key = indexnode_get_key(old_node, i);
+        int ptr = indexnode_get_pointer(old_node, i + 1); 
+        indexnode_set_key(new_node, j, key);
+        indexnode_set_pointer(new_node, j, ptr);
+    }
+
+    new_node->num_keys = total_keys - mid_index - 1;
+    old_node->num_keys = mid_index;
+
+    return middle_key;
+}
