@@ -50,27 +50,33 @@ int datanode_get_record(const BPlusDataNode *node, int pos, Record *out_record) 
  * @param new_node Pointer to newly allocated node
  * @return index of first record in new_node (the split key for parent)
  */
-int datanode_split(BPlusDataNode *old_node, BPlusDataNode *new_node) {
+int datanode_split(BPlusDataNode *old_node, BPlusDataNode *new_node, const TableSchema *schema)
+{
     datanode_init(new_node);
 
     int total = old_node->num_records;
-    int mid = total / 2;  // split in half
+    int mid = total / 2;
 
-    // Copy upper half to new node
-    int move_count = total - mid;
-    memcpy(new_node->data, old_node->data + mid * sizeof(Record), move_count * sizeof(Record));
-    new_node->num_records = move_count;
+    int record_size = schema->record_size;
+
+    
+    memcpy(new_node->data,  old_node->data + mid * record_size, (total - mid) * record_size);
+
+    new_node->num_records = total - mid;
     old_node->num_records = mid;
 
-    // Update leaf links
+    
     new_node->next_leaf = old_node->next_leaf;
-    new_node->prev_leaf = -1; // will be updated by caller
-    old_node->next_leaf = -1; // will be updated by caller
+    new_node->prev_leaf = -1; 
+    old_node->next_leaf = -1; 
 
-    // Return key for parent (first record in new node)
-    Record *split_key = (Record *)new_node->data;
-    return split_key->values[0].int_value; // assumes primary key is int
+   
+    Record tmp;
+    memcpy(&tmp, new_node->data, record_size);
+
+    return record_get_key(schema, &tmp);
 }
+
 
 
 /**
@@ -137,4 +143,10 @@ int datanode_get_prev_leaf(const BPlusDataNode *node) {
  */
 void datanode_set_prev_leaf(BPlusDataNode *node, int prev_leaf) {
     node->prev_leaf = prev_leaf;
+}
+
+int datanode_is_full(const BPlusDataNode *node, const TableSchema *schema)
+{
+    int max = (BF_BLOCK_SIZE - 3 * sizeof(int)) / schema->record_size;
+    return node->num_records >= max;
 }

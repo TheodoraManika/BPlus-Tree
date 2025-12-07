@@ -29,7 +29,7 @@ int datanode_get_num_records(const BPlusDataNode *node);
  */
 int datanode_get_record(const BPlusDataNode *node, int pos,  Record *out_record);
 
-int datanode_split(BPlusDataNode *old_node, BPlusDataNode *new_node);
+int datanode_split(BPlusDataNode *old_node, BPlusDataNode *new_node, const TableSchema *schema);
 
 int datanode_max_records(const BPlusDataNode *node);
 
@@ -63,5 +63,7 @@ int datanode_get_prev_leaf(const BPlusDataNode *node);
  * @brief Sets the previous leaf block ID.
  */
 void datanode_set_prev_leaf(BPlusDataNode *node, int prev_leaf);
+
+int datanode_is_full(const BPlusDataNode *node, const TableSchema *schema);
 
 #endif
