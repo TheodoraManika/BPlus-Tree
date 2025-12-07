@@ -75,11 +75,13 @@ void test_insert_small_records() {
     BPlusMeta* info = NULL;
     bplus_open_file(TEST_FILE, &file_desc, &info);
     
-    // Insert 5 records
+    // Insert 5 records and track their keys
     srand(12345);
+    int inserted_keys[5];
     for (int i = 0; i < 5; i++) {
         Record rec;
         employee_random_record(&schema, &rec);
+        inserted_keys[i] = record_get_key(&schema, &rec);
         int result = bplus_record_insert(file_desc, info, &rec);
         if (result != 0) {
             printf("  Failed to insert record %d\n", i);
@@ -91,20 +93,20 @@ void test_insert_small_records() {
     // Reopen and verify all records exist
     bplus_open_file(TEST_FILE, &file_desc, &info);
     
-    // Count records by searching
+    // Search for the actual inserted keys
     Record* found = NULL;
     int count = 0;
     
-    // Try searching for a key that should exist
-    int test_key = 0; // Will test with actual keys
     for (int i = 0; i < 5; i++) {
-        if (bplus_record_find(file_desc, info, i, &found) == 0 && found != NULL) {
+        found = NULL;
+        if (bplus_record_find(file_desc, info, inserted_keys[i], &found) == 0 && found != NULL) {
             count++;
             free(found);
         }
     }
     
-    print_test_result("Inserted and retrieved records", count > 0);
+    print_test_result("Inserted and retrieved records", count == 5);
+    printf("  Found %d out of 5 records\n", count);
     
     bplus_close_file(file_desc, info);
     remove(TEST_FILE);
