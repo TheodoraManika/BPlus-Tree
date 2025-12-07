@@ -27,22 +27,22 @@ int datanode_get_num_records(const BPlusDataNode *node);
 /**
  * @brief Gets a record from a data node at a specific position.
  */
-int datanode_get_record(const BPlusDataNode *node, int pos,  Record *out_record);
+int datanode_get_record(const BPlusDataNode *node, int pos, const TableSchema *schema, Record *out_record);
 
 int datanode_split(BPlusDataNode *old_node, BPlusDataNode *new_node, const TableSchema *schema);
 
-int datanode_max_records(const BPlusDataNode *node);
+int datanode_max_records(const BPlusDataNode *node, const TableSchema *schema);
 
 
 /**
  * @brief Sets a record in a data node at a specific position.
  */
-int datanode_set_record(BPlusDataNode *node, int pos, const Record *record);
+int datanode_set_record(BPlusDataNode *node, int pos, const TableSchema *schema, const Record *record);
 
 /**
  * @brief Adds a record to a data node.
  */
-int datanode_add_record(BPlusDataNode *node, const Record *record);
+int datanode_add_record(BPlusDataNode *node, const TableSchema *schema, const Record *record);
 
 /**
  * @brief Gets the next leaf block ID.

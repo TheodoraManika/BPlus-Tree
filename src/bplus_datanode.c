@@ -26,8 +26,9 @@ int datanode_get_num_records(const BPlusDataNode *node) {
 /**
  * Returns the maximum number of records that fit in this node.
  */
-int datanode_max_records(const BPlusDataNode *node) {
-   return sizeof(node->data) / sizeof(Record);
+int datanode_max_records(const BPlusDataNode *node, const TableSchema *schema) {
+    int data_area = sizeof(node->data);
+    return data_area / schema->record_size;
 }
 
 /**
@@ -38,9 +39,32 @@ int datanode_max_records(const BPlusDataNode *node) {
  * @param out_record Pointer to store the retrieved record.
  * @return 0 on success, -1 on failure.
  */
-int datanode_get_record(const BPlusDataNode *node, int pos, Record *out_record) {
+int datanode_get_record(const BPlusDataNode *node, int pos, const TableSchema *schema, Record *out_record) {
     if (pos < 0 || pos >= node->num_records) return -1;
-    memcpy(out_record, node->data + pos * sizeof(Record), sizeof(Record));
+    int rec_size = schema->record_size;
+    /* Copy only the schema-defined bytes into out_record and zero the rest */
+    /* Deserialize stored bytes into the in-memory Record structure */
+    memset(out_record, 0, sizeof(Record));
+    const char *src = node->data + pos * rec_size;
+    for (int i = 0; i < schema->count; i++) {
+        const AttributeSchema *attr = &schema->attributes[i];
+        int offset = schema->offsets[i];
+        const char *field_src = src + offset;
+        switch (attr->type) {
+            case TYPE_INT:
+                memcpy(&out_record->values[i].int_value, field_src, sizeof(int));
+                break;
+            case TYPE_FLOAT:
+                memcpy(&out_record->values[i].float_value, field_src, sizeof(float));
+                break;
+            case TYPE_CHAR:
+                memcpy(out_record->values[i].string_value, field_src, attr->length);
+                out_record->values[i].string_value[attr->length] = '\0';
+                break;
+            default:
+                break;
+        }
+    }
     return 0;
 }
 
@@ -59,8 +83,7 @@ int datanode_split(BPlusDataNode *old_node, BPlusDataNode *new_node, const Table
 
     int record_size = schema->record_size;
 
-    
-    memcpy(new_node->data,  old_node->data + mid * record_size, (total - mid) * record_size);
+    memcpy(new_node->data, old_node->data + mid * record_size, (total - mid) * record_size);
 
     new_node->num_records = total - mid;
     old_node->num_records = mid;
@@ -72,6 +95,7 @@ int datanode_split(BPlusDataNode *old_node, BPlusDataNode *new_node, const Table
 
    
     Record tmp;
+    memset(&tmp, 0, sizeof(Record));
     memcpy(&tmp, new_node->data, record_size);
 
     return record_get_key(schema, &tmp);
@@ -87,10 +111,30 @@ int datanode_split(BPlusDataNode *old_node, BPlusDataNode *new_node, const Table
  * @param schema Pointer to the table schema.
  * @return 0 on success, -1 on failure.
  */
-int datanode_set_record(BPlusDataNode *node, int pos, const Record *record) {
-    if (pos < 0 || pos >= datanode_max_records(node) ) 
-    return -1;
-    memcpy(node->data + pos * sizeof(Record), record, sizeof(Record));
+int datanode_set_record(BPlusDataNode *node, int pos, const TableSchema *schema, const Record *record) {
+    if (pos < 0 || pos >= datanode_max_records(node, schema) ) 
+        return -1;
+    int rec_size = schema->record_size;
+    char *dst = node->data + pos * rec_size;
+    /* Serialize in-memory Record into compact bytes according to schema */
+    for (int i = 0; i < schema->count; i++) {
+        const AttributeSchema *attr = &schema->attributes[i];
+        int offset = schema->offsets[i];
+        char *field_dst = dst + offset;
+        switch (attr->type) {
+            case TYPE_INT:
+                memcpy(field_dst, &record->values[i].int_value, sizeof(int));
+                break;
+            case TYPE_FLOAT:
+                memcpy(field_dst, &record->values[i].float_value, sizeof(float));
+                break;
+            case TYPE_CHAR:
+                memcpy(field_dst, record->values[i].string_value, attr->length);
+                break;
+            default:
+                break;
+        }
+    }
     if (pos >= node->num_records) node->num_records = pos + 1;
     return 0;
 }
@@ -102,10 +146,35 @@ int datanode_set_record(BPlusDataNode *node, int pos, const Record *record) {
  * @param schema Pointer to the table schema.
  * @return 0 on success, -1 on failure.
  */
-int datanode_add_record(BPlusDataNode *node, const Record *record) {
-    if (node->num_records >= datanode_max_records(node))
+int datanode_add_record(BPlusDataNode *node, const TableSchema *schema, const Record *record) {
+    int key = record_get_key(schema, record);
+    int n = datanode_get_num_records(node);
+
+    if (n >= datanode_max_records(node, schema))
         return -1; // node full
-    return datanode_set_record(node, node->num_records, record);
+
+    // Find position to insert (sorted by key)
+    int pos = 0;
+    Record temp;
+    for (pos = 0; pos < n; pos++) {
+        datanode_get_record(node, pos, schema, &temp);
+        if (key < record_get_key(schema, &temp))
+            break;
+    }
+
+    // Shift records to make space
+    for (int i = n; i > pos; i--) {
+        datanode_get_record(node, i - 1, schema, &temp);
+        datanode_set_record(node, i, schema, &temp);
+    }
+
+    // Insert new record
+    datanode_set_record(node, pos, schema, record);
+
+    // Update record count
+    node->num_records++;
+
+    return 0;
 }
 
 /**

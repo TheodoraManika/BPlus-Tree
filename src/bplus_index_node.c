@@ -4,6 +4,14 @@
 #include <stdlib.h>
 
 /**
+ * Helper function to compute max_keys based on the data area size
+ */
+static int compute_max_keys() {
+    int data_size = BF_BLOCK_SIZE - 2 * sizeof(int);  // same as sizeof(node->data)
+    return (data_size - sizeof(int)) / (2 * sizeof(int));
+}
+
+/**
  * @brief Initializes an empty index node.
  * @param node Pointer to the index node to initialize.
  * @param is_leaf 1 if this is a leaf node, 0 if internal index node.
@@ -11,11 +19,9 @@
 void indexnode_init(BPlusIndexNode *node, int is_leaf) {
     node->num_keys = 0;
     node->is_leaf = is_leaf;
-    // Calculate max_keys based on available data space
-    // Each entry needs 1 key (int) and we need num_keys + 1 pointers (ints)
-    // So total: num_keys * sizeof(int) + (num_keys + 1) * sizeof(int) <= data size
-    // Solving: num_keys * (2 * sizeof(int)) + sizeof(int) <= data size
-    node->max_keys = (sizeof(node->data) - sizeof(int)) / (2 * sizeof(int));
+    // max_keys is computed on-the-fly, not stored
+    node->max_keys = compute_max_keys();
+    memset(node->data, 0, sizeof(node->data));
 }
 
 /**
@@ -33,7 +39,8 @@ int indexnode_get_num_keys(const BPlusIndexNode *node) {
  * @return Maximum number of keys.
  */
 int indexnode_get_max_keys(const BPlusIndexNode *node) {
-    return node->max_keys;
+    (void)node;  // unused, max_keys is always computed
+    return compute_max_keys();
 }
 
 /**
@@ -59,12 +66,14 @@ int indexnode_get_key(const BPlusIndexNode *node, int pos) {
  * @return The block ID, or -1 on failure.
  */
 int indexnode_get_pointer(const BPlusIndexNode *node, int pos) {
-    if (pos < 0 || pos > node->num_keys) {
+    int max_keys = compute_max_keys();
+    if (pos < 0 || pos > max_keys) {
         return -1; // Invalid position
     }
 
     int pointer;
-    memcpy(&pointer, node->data + (node->num_keys * sizeof(int)) + pos * sizeof(int), sizeof(int));
+    /* pointers are stored after the keys area which is max_keys * sizeof(int) */
+    memcpy(&pointer, node->data + (max_keys * sizeof(int)) + pos * sizeof(int), sizeof(int));
     return pointer;
 }
 
@@ -76,7 +85,8 @@ int indexnode_get_pointer(const BPlusIndexNode *node, int pos) {
  * @return 0 on success, -1 on failure.
  */
 int indexnode_set_key(BPlusIndexNode *node, int pos, int key) {
-    if (pos < 0 || pos >= node->num_keys) {
+    int max_keys = compute_max_keys();
+    if (pos < 0 || pos >= max_keys) {
         return -1; // Invalid position
     }
 
@@ -92,11 +102,12 @@ int indexnode_set_key(BPlusIndexNode *node, int pos, int key) {
  * @return 0 on success, -1 on failure.
  */
 int indexnode_set_pointer(BPlusIndexNode *node, int pos, int block_id) {
-    if (pos < 0 || pos > node->num_keys) {
+    int max_keys = compute_max_keys();
+    if (pos < 0 || pos > max_keys) {
         return -1; // Invalid position
     }
 
-    memcpy(node->data + (node->num_keys * sizeof(int)) + pos * sizeof(int), &block_id, sizeof(int));
+    memcpy(node->data + (max_keys * sizeof(int)) + pos * sizeof(int), &block_id, sizeof(int));
     return 0;
 }
 
@@ -109,26 +120,39 @@ int indexnode_set_pointer(BPlusIndexNode *node, int pos, int block_id) {
  * @return 0 on success, -1 on failure.
  */
 int indexnode_add_key_pointer(BPlusIndexNode *node, int key, int left_child, int right_child) {
-    if (node->num_keys >= node->max_keys) {
+    int max_keys = compute_max_keys();
+    if (node->num_keys >= max_keys) {
         return -1; // No space available
     }
 
-    // Find position to insert the new key
-    int pos = 0;
-    while (pos < node->num_keys && indexnode_get_key(node, pos) < key) {
-        pos++;
-    }
+    /* Read existing keys and pointers into temporaries */
+    int keys[max_keys];
+    int ptrs[max_keys + 1];
+    for (int i = 0; i < node->num_keys; i++) keys[i] = indexnode_get_key(node, i);
+    for (int i = 0; i <= node->num_keys; i++) ptrs[i] = indexnode_get_pointer(node, i);
 
-    // Shift keys and pointers to make space
-    for (int i = node->num_keys; i > pos; i--) {
-        indexnode_set_key(node, i, indexnode_get_key(node, i - 1));
-        indexnode_set_pointer(node, i + 1, indexnode_get_pointer(node, i));
-    }
+    // Find insertion position
+    int pos = 0;
+    while (pos < node->num_keys && keys[pos] < key) pos++;
+
+    // Shift in-memory arrays
+    for (int i = node->num_keys; i > pos; i--) keys[i] = keys[i - 1];
+    for (int i = node->num_keys + 1; i > pos + 1; i--) ptrs[i] = ptrs[i - 1];
 
     // Insert new key and pointers
-    indexnode_set_key(node, pos, key);
-    indexnode_set_pointer(node, pos, left_child);
-    indexnode_set_pointer(node, pos + 1, right_child);
+    keys[pos] = key;
+    ptrs[pos] = left_child;
+    ptrs[pos + 1] = right_child;
+
+    // Write back into node data area
+    for (int i = 0; i <= max_keys - 1; i++) {
+        int k = (i < node->num_keys + 1) ? keys[i] : 0;
+        memcpy(node->data + i * sizeof(int), &k, sizeof(int));
+    }
+    for (int i = 0; i <= max_keys; i++) {
+        int p = (i < node->num_keys + 2) ? ptrs[i] : 0;
+        memcpy(node->data + (max_keys * sizeof(int)) + i * sizeof(int), &p, sizeof(int));
+    }
 
     node->num_keys++;
     return 0;
@@ -142,9 +166,7 @@ int indexnode_add_key_pointer(BPlusIndexNode *node, int key, int left_child, int
  */
 int indexnode_find_child(const BPlusIndexNode *node, int key) {
     int pos = 0;
-    while (pos < node->num_keys && indexnode_get_key(node, pos) <= key) {
-        pos++;
-    }
+    while (pos < node->num_keys && indexnode_get_key(node, pos) <= key) pos++;
     return indexnode_get_pointer(node, pos);
 }
 
@@ -164,9 +186,10 @@ int indexnode_split(BPlusIndexNode *old_node, BPlusIndexNode *new_node) {
     int middle_key = indexnode_get_key(old_node, mid_index);
 
    
-    for (int i = mid_index + 1, j = 0; i < total_keys; i++, j++) {
+    int j = 0;
+    for (int i = mid_index + 1; i < total_keys; i++, j++) {
         int key = indexnode_get_key(old_node, i);
-        int ptr = indexnode_get_pointer(old_node, i + 1); 
+        int ptr = indexnode_get_pointer(old_node, i + 1);
         indexnode_set_key(new_node, j, key);
         indexnode_set_pointer(new_node, j, ptr);
     }
